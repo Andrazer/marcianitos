@@ -1,5 +1,5 @@
 
-## 👋 hello puzle
+## 👋 hello mars
 
 # Desarrollo "sencillo" de un juego
 
