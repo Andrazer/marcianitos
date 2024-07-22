@@ -7,6 +7,8 @@ pygame.init()
 # Definir colores
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 
 # Definir dimensiones de la pantalla
 SCREEN_WIDTH = 800
@@ -16,13 +18,30 @@ SCREEN_HEIGHT = 600
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Juego de Marcianitos')
 
-# Cargar la imagen de fondo
+# Cargar y escalar la imagen de fondo
 background = pygame.image.load('assets/fondo.jpg')
 background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
 # Configurar reloj
 clock = pygame.time.Clock()
 FPS = 60
+
+# Configurar fuente para el texto
+font = pygame.font.Font('assets/8-bit Arcade In.ttf', 42)
+
+class Level:
+    def __init__(self, number, enemy_rows, enemy_cols, enemy_speed):
+        self.number = number
+        self.enemy_rows = enemy_rows
+        self.enemy_cols = enemy_cols
+        self.enemy_speed = enemy_speed
+
+    def setup_level(self, all_sprites, enemies):
+        for x in range(self.enemy_cols):
+            for y in range(self.enemy_rows):
+                enemy = Enemy(x * 60, y * 40, self.enemy_speed)
+                all_sprites.add(enemy)
+                enemies.add(enemy)
 
 class Explosion(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -38,7 +57,6 @@ class Explosion(pygame.sprite.Sprite):
         self.lifetime += 1
         if self.lifetime > 10:  # Ajusta el número según la duración deseada
             self.kill()
-
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -61,14 +79,14 @@ class Player(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, speed):
         super().__init__()
         original_image = pygame.image.load('assets/enemy.png').convert_alpha()
         self.image = pygame.transform.scale(original_image, (40, 30))
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        self.speed = 1
+        self.speed = speed
 
     def update(self):
         self.rect.x += self.speed
@@ -109,33 +127,33 @@ def check_collisions(bullets, enemies, explosions):
                 all_sprites.add(explosion)
                 explosions.add(explosion)
 
-def check_win_condition(enemies):
-    return len(enemies) == 0
-
 def display_message(text, color, position):
-    font = pygame.font.SysFont(None, 55)
     message = font.render(text, True, color)
     screen.blit(message, position)
 
 def reset_game():
-    global player, enemies, bullets, explosions, all_sprites, game_won
-
+    global all_sprites, enemies, bullets, explosions, player, levels, current_level_index, current_level, game_won
+    # Vaciar todos los grupos de sprites
     all_sprites.empty()
     enemies.empty()
     bullets.empty()
     explosions.empty()
 
-    # Crear jugador
-    player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50)
+    # Volver a crear el jugador y los niveles
+    player = Player(SCREEN_WIDTH // 4, SCREEN_HEIGHT - 50)
     all_sprites.add(player)
 
-    # Crear enemigos
-    for x in range(10):
-        for y in range(5):
-            enemy = Enemy(x * 60, y * 40)
-            all_sprites.add(enemy)
-            enemies.add(enemy)
-
+    levels = [
+        Level(1, 3, 5, 1),
+        Level(2, 4, 6, 1.5),
+        Level(3, 5, 7, 2),
+        Level(4, 7, 10, 4)
+    ]
+    
+    current_level_index = 0
+    current_level = levels[current_level_index]
+    current_level.setup_level(all_sprites, enemies)
+    
     game_won = False
 
 # Crear grupos de sprites
@@ -145,15 +163,20 @@ bullets = pygame.sprite.Group()
 explosions = pygame.sprite.Group()  # Nuevo grupo para explosiones
 
 # Crear jugador
-player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50)
+player = Player(SCREEN_WIDTH // 4, SCREEN_HEIGHT - 50)
 all_sprites.add(player)
 
-# Crear enemigos
-for x in range(10):
-    for y in range(5):
-        enemy = Enemy(x * 60, y * 40)
-        all_sprites.add(enemy)
-        enemies.add(enemy)
+# Definir niveles
+levels = [
+    Level(1, 3, 5, 1),
+    Level(2, 4, 6, 1.5),
+    Level(3, 5, 7, 2),
+    Level(4, 7, 10, 4)
+]
+
+current_level_index = 0
+current_level = levels[current_level_index]
+current_level.setup_level(all_sprites, enemies)
 
 # Bucle principal del juego
 running = True
@@ -171,27 +194,36 @@ while running:
             if event.key == pygame.K_r and game_won:
                 reset_game()
     
-    if not game_won:
-        # Actualizar todos los sprites
-        all_sprites.update()
-        explosions.update()  # Actualizar explosiones
+    # Actualizar todos los sprites
+    all_sprites.update()
+    explosions.update()  # Actualizar explosiones
 
-        # Comprobar colisiones
-        check_collisions(bullets, enemies, explosions)
+    # Comprobar colisiones
+    check_collisions(bullets, enemies, explosions)
 
-        # Comprobar si el juego ha ganado
-        if check_win_condition(enemies):
+    # Verificar si todos los enemigos han sido eliminados
+    if len(enemies) == 0:
+        current_level_index += 1
+        if current_level_index < len(levels):
+            current_level = levels[current_level_index]
+            current_level.setup_level(all_sprites, enemies)
+        else:
             game_won = True
     
     # Dibujar todo en la pantalla
-    # screen.fill(BLACK)
-    screen.blit(background, (0, 0))
+    screen.blit(background, (0, 0))  # Dibujar el fondo
     all_sprites.draw(screen)
-    
+
+    # Dibujar el texto de nivel y enemigos restantes
+    level_text = font.render(f"Level {current_level.number}", True, WHITE)
+    enemies_text = font.render(f"Enemies {len(enemies)}", True, WHITE)
+    screen.blit(level_text, (20, SCREEN_HEIGHT - 50))
+    screen.blit(enemies_text, (600, SCREEN_HEIGHT - 50))
+        
     if game_won:
-        display_message("¡Felicidades! Ganaste", WHITE, (SCREEN_WIDTH // 4, SCREEN_HEIGHT // 2))
-        display_message("Presiona R para reiniciar", WHITE, (SCREEN_WIDTH // 4, SCREEN_HEIGHT // 2 + 60))
-    
+        display_message("Has completado todos los niveles", GREEN, (SCREEN_WIDTH // 8, SCREEN_HEIGHT // 2))
+        display_message("Presiona R para reiniciar", RED, (SCREEN_WIDTH // 4, SCREEN_HEIGHT // 2 + 100))
+        
     # Actualizar pantalla
     pygame.display.flip()
     
