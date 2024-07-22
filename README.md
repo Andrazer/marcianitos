@@ -1,7 +1,7 @@
 
-## 👋 hello puzle
+## 👋 hello mars
 
-# Desarrollo "sencillo" de un juego
+### Desarrollo "sencillo" de un juego
 
 ![Mars](assets/caratula.jpg)
 
